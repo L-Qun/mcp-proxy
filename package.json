@@ -1,0 +1,66 @@
+{
+  "name": "@mcp-stack/proxy",
+  "version": "1.0.0",
+  "description": "Proxy service for MCP Stack",
+  "main": "lib/bin/mcp-proxy.js",
+  "type": "commonjs",
+  "types": "lib/index.d.ts",
+  "bin": {
+    "mcp-proxy": "bin/mcp-proxy"
+  },
+  "files": [
+    "lib/**/*",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "heft test --clean",
+    "eslint": "eslint --no-eslintrc -c .eslintrc.json --fix '**/src/*.{js,jsx,ts,tsx}'",
+    "eslint:ci": "eslint --no-eslintrc -c .eslintrc.json '**/src/*.{js,jsx,ts,tsx}'",
+    "prettier": "prettier '**/{examples,src,__tests__,website}/**/*.{js,jsx,ts,tsx,md}' --write",
+    "prettier:ci": "prettier '**/{examples,src,__tests__,website}/**/*.{js,jsx,ts,tsx,md}' --list-different",
+    "typecheck": "tsc --noEmit",
+    "build": "heft build --clean",
+    "prepublishOnly": "heft build --clean"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/L-Qun/mcp-proxy"
+  },
+  "prettier": {
+    "semi": false,
+    "singleQuote": true
+  },
+  "keywords": [
+    "mcp",
+    "proxy",
+    "sse",
+    "stdio"
+  ],
+  "author": "L-Qun",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/L-Qun/kuri/issues"
+  },
+  "homepage": "https://github.com/L-Qun/kuri#readme",
+  "devDependencies": {
+    "@rushstack/eslint-config": "^3.6.2",
+    "@rushstack/eslint-patch": "^1.7.2",
+    "@rushstack/heft": "^0.65.1",
+    "@rushstack/heft-node-rig": "^2.4.5",
+    "@rushstack/node-core-library": "^3.61.0",
+    "@types/express": "^5.0.1",
+    "@types/heft-jest": "1.0.6",
+    "@types/node": "^20.14.10",
+    "eslint": "~8.7.0",
+    "prettier": "^3.3.2",
+    "typescript": "^5.5.3"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.8.0",
+    "commander": "^13.1.0",
+    "express": "^4.21.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
