@@ -2,7 +2,7 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import express, { Express } from 'express'
 
-import { getAvailablePort } from '../utilities'
+import { getAvailablePort, log } from '../utilities'
 
 interface ISSE2StdioOptions {
   command: string
@@ -10,6 +10,12 @@ interface ISSE2StdioOptions {
   port: number
 }
 
+/**
+ * Server-Sent Events to Standard Input/Output Proxy
+ * ┌──────┐      ┌──────────────────┐      ┌────────────────────┐      ┌──────┐
+ * │Client├─────►│SSEServerTransport├─────►│StdioClientTransport├─────►│Server│
+ * └──────┘      └──────────────────┘      └────────────────────┘      └──────┘
+ */
 export class SSE2Stdio {
   private _stdioClientTransport: StdioClientTransport
   private _options: ISSE2StdioOptions
@@ -25,11 +31,11 @@ export class SSE2Stdio {
   }
 
   private _onClientError(error: Error): void {
-    console.error('SSE2Stdio: client error', error)
+    log('SSE2Stdio: client error', error)
   }
 
   private _onServerError(error: Error): void {
-    console.log('SSE2Stdio: server error', error)
+    log('SSE2Stdio: server error', error)
   }
 
   private async _createExpressApp(): Promise<Express> {
@@ -61,16 +67,19 @@ export class SSE2Stdio {
     return app
   }
 
+  /**
+   * Start the proxy
+   */
   public async start(): Promise<void> {
     await this._stdioClientTransport.start()
     const app = await this._createExpressApp()
     const port = await getAvailablePort(this._options.port)
     app.listen(port, () => {
-      console.log(`SSE2Stdio: server started on port ${port}`)
+      log(`SSE2Stdio: server started on port ${port}`)
     })
 
     process.on('SIGINT', () => {
-      console.error('\nSIGINT received. Shutting down...')
+      log('\nSIGINT received. Shutting down...')
       this._stdioClientTransport.close().catch(this._onServerError)
       Object.values(this._transports).forEach((transport) =>
         transport.close().catch(this._onClientError),
@@ -80,6 +89,12 @@ export class SSE2Stdio {
   }
 }
 
+/**
+ * Run SSE2Stdio proxy
+ * @param commandWithArgs - Command and its arguments
+ * @param options - Configuration options
+ * @param options.port - Server port
+ */
 export const runSSE2Stdio = async (
   commandWithArgs: string[],
   options: { port: string },
@@ -89,9 +104,7 @@ export const runSSE2Stdio = async (
     const childArgs = commandWithArgs.slice(1)
     const port = parseInt(options.port, 10)
 
-    console.log(
-      `Starting proxy: forwarding SSE on port ${port} to ${childCommand}`,
-    )
+    log(`Starting proxy: forwarding SSE on port ${port} to ${childCommand}`)
     const proxy = new SSE2Stdio({
       command: childCommand,
       args: childArgs,
@@ -100,7 +113,7 @@ export const runSSE2Stdio = async (
 
     await proxy.start()
   } catch (error) {
-    console.error('sse2stdio mode failed:', error)
+    log('sse2stdio mode failed:', error)
     process.exit(1)
   }
 }

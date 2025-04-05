@@ -1,10 +1,18 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
 
+import { log } from '../utilities'
+
 interface IStdio2SSEOptions {
   serverUrl: string
 }
 
+/**
+ * Standard Input/Output to Server-Sent Events Proxy
+ * ┌──────┐      ┌────────────────────┐      ┌──────────────────┐      ┌──────┐
+ * │Client├─────►│StdioServerTransport├─────►│SSEClientTransport├─────►│Server│
+ * └──────┘      └────────────────────┘      └──────────────────┘      └──────┘
+ */
 export class Stdio2SSE {
   private _stdioServerTransport: StdioServerTransport
   private _sseClientTransport: SSEClientTransport
@@ -17,11 +25,11 @@ export class Stdio2SSE {
   }
 
   private _onClientError(error: Error): void {
-    console.error('Stdio2SSE: client error', error)
+    log('Stdio2SSE: client error', error)
   }
 
   private _onServerError(error: Error): void {
-    console.log('Stdio2SSE: server error', error)
+    log('Stdio2SSE: server error', error)
   }
 
   private _configureProxy(): void {
@@ -45,36 +53,45 @@ export class Stdio2SSE {
     }
   }
 
+  private _cleanUp(): void {
+    this._stdioServerTransport.close().catch(this._onServerError)
+    this._sseClientTransport.close().catch(this._onClientError)
+  }
+
+  /**
+   * Start the proxy
+   */
   public async start(): Promise<void> {
-    console.error('Establishing mcp proxy...')
+    log('Establishing mcp proxy...')
 
     this._configureProxy()
 
-    await Promise.all([
-      this._stdioServerTransport.start(),
-      this._sseClientTransport.start(),
-    ])
+    // We should first start SSEClientTransport
+    await this._sseClientTransport.start()
+    await this._stdioServerTransport.start()
 
-    console.error('Proxy established')
+    log('Proxy established')
+    log('Press Ctrl+C to exit')
 
     process.on('SIGINT', () => {
-      console.error('\nSIGINT received.Shutting down...')
-      this._stdioServerTransport.close().catch(this._onServerError)
-      this._sseClientTransport.close().catch(this._onClientError)
+      log('\nSIGINT received. Shutting down...')
+      this._cleanUp()
       process.exit(0)
     })
   }
 }
 
+/**
+ * Run Stdio2SSE proxy
+ * @param serverUrl - URL address of the SSE server
+ */
 export const runStdio2SSE = async (serverUrl: string): Promise<void> => {
   try {
-    console.log(
-      `Starting proxy: forwarding stdio to SSE server at ${serverUrl}`,
-    )
+    log(`Starting proxy: forwarding stdio to SSE server at ${serverUrl}`)
     const proxy = new Stdio2SSE({ serverUrl })
     await proxy.start()
   } catch (error) {
-    console.error('stdio2sse mode failed:', error)
+    log('stdio2sse mode failed:', error)
     process.exit(1)
   }
 }

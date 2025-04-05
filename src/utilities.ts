@@ -34,3 +34,8 @@ export function getVersionNumber(): string {
   const packageJson = require(path.resolve(__dirname, '../package.json'))
   return packageJson.version
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function log(message?: any, ...optionalParams: any[]): void {
+  console.error(message, ...optionalParams)
+}
