@@ -20,6 +20,7 @@ export class SSE2Stdio {
   private _stdioClientTransport: StdioClientTransport
   private _options: ISSE2StdioOptions
   private _transports: { [sessionId: string]: SSEServerTransport }
+  private _endpoint: string
 
   public constructor(options: ISSE2StdioOptions) {
     this._options = options
@@ -28,6 +29,7 @@ export class SSE2Stdio {
       args: options.args,
     })
     this._transports = {}
+    this._endpoint = '/messages'
   }
 
   private _onClientError(error: Error): void {
@@ -42,19 +44,37 @@ export class SSE2Stdio {
     const app = express()
 
     app.get('/sse', async (req, res) => {
-      const transport = new SSEServerTransport('/messages', res)
-      this._transports[transport.sessionId] = transport
-      res.on('close', () => {
-        delete this._transports[transport.sessionId]
-        this._stdioClientTransport.close().catch(this._onServerError)
+      const transport = new SSEServerTransport(this._endpoint, res)
+      const sessionId = transport.sessionId
+      this._transports[sessionId] = transport
+
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
       })
+
+      res.write(
+        `event: endpoint\ndata: ${encodeURI(this._endpoint)}?sessionId=${sessionId}\n\n`,
+      )
+
+      // @ts-ignore
+      transport._sseResponse = res
 
       transport.onmessage = (message) => {
         this._stdioClientTransport.send(message).catch(this._onServerError)
       }
+      this._stdioClientTransport.onmessage = (message) => {
+        transport.send(message).catch(this._onClientError)
+      }
+
+      res.on('close', () => {
+        delete this._transports[transport.sessionId]
+        this._stdioClientTransport.close().catch(this._onServerError)
+      })
     })
 
-    app.post('/messages', async (req, res) => {
+    app.post(this._endpoint, async (req, res) => {
       const sessionId = req.query.sessionId as string
       const transport = this._transports[sessionId]
       if (transport) {
@@ -72,6 +92,7 @@ export class SSE2Stdio {
    */
   public async start(): Promise<void> {
     await this._stdioClientTransport.start()
+
     const app = await this._createExpressApp()
     const port = await getAvailablePort(this._options.port)
     app.listen(port, () => {

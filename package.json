@@ -1,6 +1,6 @@
 {
   "name": "mcp-proxy",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Proxy service for MCP Stack",
   "main": "lib/bin/mcp-proxy.js",
   "type": "commonjs",

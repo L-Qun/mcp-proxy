@@ -17,7 +17,7 @@ program
   .action(runStdio2SSE)
 
 program
-  .command('stdin-to-sse <command...>')
+  .command('sse-to-stdio <command...>')
   .description('Forward SSE server messages to a child process stdin/stdout')
   .option('-p, --port <port>', 'Set the SSE server port', '8080')
   .action(runSSE2Stdio)
@@ -27,7 +27,7 @@ program.addHelpText(
   `
 Examples:
   $ mcp-proxy stdio-to-sse https://my-mcp-server/sse
-  $ mcp-proxy stdin-to-sse node server.js --port 8080
+  $ mcp-proxy sse-to-stdio node server.js --port 8080
 `,
 )
 
