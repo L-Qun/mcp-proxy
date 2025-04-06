@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-stack/proxy",
+  "name": "mcp-proxy",
   "version": "1.0.0",
   "description": "Proxy service for MCP Stack",
   "main": "lib/bin/mcp-proxy.js",
