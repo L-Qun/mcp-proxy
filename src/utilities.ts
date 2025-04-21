@@ -7,6 +7,7 @@ export async function getAvailablePort(preferredPort: number): Promise<number> {
 
     server.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE') {
+        log(`Port ${preferredPort} is already in use, trying a random port instead`)
         server.listen(0)
       } else {
         reject(err)
