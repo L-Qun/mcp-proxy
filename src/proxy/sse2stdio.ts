@@ -17,18 +17,15 @@ interface ISSE2StdioOptions {
  * └──────┘      └──────────────────┘      └────────────────────┘      └──────┘
  */
 export class SSE2Stdio {
-  private _stdioClientTransport: StdioClientTransport
   private _options: ISSE2StdioOptions
-  private _transports: { [sessionId: string]: SSEServerTransport }
+  private _sseTransports: { [sessionId: string]: SSEServerTransport }
+  private _stdioTransports: { [sessionId: string]: StdioClientTransport }
   private _endpoint: string
 
   public constructor(options: ISSE2StdioOptions) {
     this._options = options
-    this._stdioClientTransport = new StdioClientTransport({
-      command: options.command,
-      args: options.args,
-    })
-    this._transports = {}
+    this._sseTransports = {}
+    this._stdioTransports = {}
     this._endpoint = '/messages'
   }
 
@@ -44,9 +41,15 @@ export class SSE2Stdio {
     const app = express()
 
     app.get('/sse', async (req, res) => {
-      const transport = new SSEServerTransport(this._endpoint, res)
-      const sessionId = transport.sessionId
-      this._transports[sessionId] = transport
+      const sseTransport = new SSEServerTransport(this._endpoint, res)
+      const stdioTransport = new StdioClientTransport({
+        command: this._options.command,
+        args: this._options.args,
+      })
+
+      const sessionId = sseTransport.sessionId
+      this._sseTransports[sessionId] = sseTransport
+      this._stdioTransports[sessionId] = stdioTransport
 
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -59,26 +62,31 @@ export class SSE2Stdio {
       )
 
       // @ts-ignore
-      transport._sseResponse = res
+      sseTransport._sseResponse = res
 
-      transport.onmessage = (message) => {
-        this._stdioClientTransport.send(message).catch(this._onServerError)
+      sseTransport.onmessage = (message) => {
+        stdioTransport.send(message).catch(this._onClientError)
       }
-      this._stdioClientTransport.onmessage = (message) => {
-        transport.send(message).catch(this._onClientError)
+      stdioTransport.onmessage = (message) => {
+        sseTransport.send(message).catch(this._onServerError)
       }
+
+      await stdioTransport.start()
 
       res.on('close', () => {
-        delete this._transports[transport.sessionId]
-        this._stdioClientTransport.close().catch(this._onServerError)
+        delete this._sseTransports[sessionId]
+        delete this._stdioTransports[sessionId]
+        sseTransport.close().catch(this._onServerError)
+        stdioTransport.close().catch(this._onClientError)
       })
     })
 
     app.post(this._endpoint, async (req, res) => {
       const sessionId = req.query.sessionId as string
-      const transport = this._transports[sessionId]
-      if (transport) {
-        await transport.handlePostMessage(req, res)
+      const sseTransport = this._sseTransports[sessionId]
+      const stdioTransport = this._stdioTransports[sessionId]
+      if (sseTransport && stdioTransport) {
+        await sseTransport.handlePostMessage(req, res)
       } else {
         res.status(400).send('No transport found for sessionId')
       }
@@ -91,8 +99,6 @@ export class SSE2Stdio {
    * Start the proxy
    */
   public async start(): Promise<void> {
-    await this._stdioClientTransport.start()
-
     const app = await this._createExpressApp()
     const port = await getAvailablePort(this._options.port)
     app.listen(port, () => {
@@ -101,9 +107,11 @@ export class SSE2Stdio {
 
     process.on('SIGINT', () => {
       log('\nSIGINT received. Shutting down...')
-      this._stdioClientTransport.close().catch(this._onServerError)
-      Object.values(this._transports).forEach((transport) =>
-        transport.close().catch(this._onClientError),
+      Object.values(this._stdioTransports).forEach((stdioTransport) =>
+        stdioTransport.close().catch(this._onClientError),
+      )
+      Object.values(this._sseTransports).forEach((sseTransport) =>
+        sseTransport.close().catch(this._onServerError),
       )
       process.exit(0)
     })
@@ -125,7 +133,6 @@ export const runSSE2Stdio = async (
     const childArgs = commandWithArgs.slice(1)
     const port = parseInt(options.port, 10)
 
-    log(`Starting proxy: forwarding SSE on port ${port} to ${childCommand}`)
     const proxy = new SSE2Stdio({
       command: childCommand,
       args: childArgs,
